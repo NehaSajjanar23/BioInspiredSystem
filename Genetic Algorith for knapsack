@@ -1,0 +1,56 @@
+import random
+
+items = [(5, 30), (8, 50), (3, 20), (6, 60), (4, 40), (2, 20)]
+max_weight = 15
+
+pop_size = 10
+generations = 30
+mutation_rate = 0.1
+chromosome_length = len(items)
+
+def init_population():
+    return [ [random.choice([0,1]) for _ in range(chromosome_length)] for _ in range(pop_size)]
+
+def fitness(chromosome):
+    total_weight = sum([items[i][0] * chromosome[i] for i in range(chromosome_length)])
+    total_value = sum([items[i][1] * chromosome[i] for i in range(chromosome_length)])
+    return total_value if total_weight <= max_weight else 0
+
+def select(pop, fits):
+    tournament_size = 3
+    selected = random.sample(list(zip(pop, fits)), tournament_size)
+    return max(selected, key=lambda x: x[1])[0]
+
+def crossover(parent1, parent2):
+    point = random.randint(1, chromosome_length - 1)
+    child = parent1[:point] + parent2[point:]
+    return child
+
+def mutate(chromosome):
+    for i in range(chromosome_length):
+        if random.random() < mutation_rate:
+            chromosome[i] = 1 - chromosome[i]
+    return chromosome
+
+population = init_population()
+
+for _ in range(generations):
+    fits = [fitness(ind) for ind in population]
+    new_pop = []
+    for _ in range(pop_size):
+        p1 = select(population, fits)
+        p2 = select(population, fits)
+        child = crossover(p1, p2)
+        child = mutate(child)
+        new_pop.append(child)
+    population = new_pop
+
+fits = [fitness(ind) for ind in population]
+best_idx = fits.index(max(fits))
+best_chromosome = population[best_idx]
+best_value = fits[best_idx]
+best_weight = sum([items[i][0] * best_chromosome[i] for i in range(chromosome_length)])
+
+print("Best Chromosome:", best_chromosome)
+print("Total Value:", best_value)
+print("Total Weight:", best_weight)
