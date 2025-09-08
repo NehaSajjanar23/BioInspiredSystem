@@ -1,0 +1,63 @@
+import numpy as np
+import random
+
+def generate_cities(n, width=100, height=100):
+    return np.random.rand(n, 2) * [width, height]
+
+NUM_CITIES = 20
+NUM_ANTS = 20
+ALPHA = 1.0
+BETA = 5.0
+RHO = 0.5
+Q = 100
+NUM_ITERATIONS = 100
+
+cities = generate_cities(NUM_CITIES)
+distances = np.linalg.norm(cities[:, None, :] - cities[None, :, :], axis=2)
+pheromones = np.ones((NUM_CITIES, NUM_CITIES))
+heuristic = 1 / (distances + np.diag([np.inf]*NUM_CITIES))
+
+def construct_solution(pheromones, heuristic):
+    solutions = []
+    lengths = []
+    for _ in range(NUM_ANTS):
+        visited = [random.randint(0, NUM_CITIES - 1)]
+        for _ in range(NUM_CITIES - 1):
+            current = visited[-1]
+            probs = (pheromones[current] ** ALPHA) * (heuristic[current] ** BETA)
+            probs[visited] = 0
+            total = np.sum(probs)
+            if total == 0:
+                next_city = random.choice([c for c in range(NUM_CITIES) if c not in visited])
+            else:
+                probs /= total
+                next_city = np.random.choice(range(NUM_CITIES), p=probs)
+            visited.append(next_city)
+        visited.append(visited[0])
+        solutions.append(visited)
+        length = sum(distances[visited[i], visited[i+1]] for i in range(NUM_CITIES))
+        lengths.append(length)
+    return solutions, lengths
+
+def update_pheromones(pheromones, solutions, lengths):
+    pheromones *= (1 - RHO)
+    for solution, length in zip(solutions, lengths):
+        for i in range(NUM_CITIES):
+            a, b = solution[i], solution[i + 1]
+            pheromones[a][b] += Q / length
+            pheromones[b][a] += Q / length
+
+best_length = float('inf')
+best_solution = []
+
+for iteration in range(NUM_ITERATIONS):
+    solutions, lengths = construct_solution(pheromones, heuristic)
+    update_pheromones(pheromones, solutions, lengths)
+    min_length = min(lengths)
+    if min_length < best_length:
+        best_length = min_length
+        best_solution = solutions[lengths.index(min_length)]
+
+print("Best route found:")
+print(best_solution)
+print(f"Total route length: {best_length:.2f}")
