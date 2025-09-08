@@ -1,18 +1,25 @@
 import numpy as np
 import random
 
-def generate_cities(n, width=100, height=100):
-    return np.random.rand(n, 2) * [width, height]
+def input_cities():
+    num = int(input("Enter the number of cities: "))
+    print("Enter coordinates as: x y")
+    coords = []
+    for i in range(num):
+        x, y = map(float, input(f"City {i} coordinates: ").split())
+        coords.append([x, y])
+    return np.array(coords)
 
-NUM_CITIES = 20
-NUM_ANTS = 20
 ALPHA = 1.0
 BETA = 5.0
 RHO = 0.5
 Q = 100
+NUM_ANTS = 20
 NUM_ITERATIONS = 100
 
-cities = generate_cities(NUM_CITIES)
+cities = input_cities()
+NUM_CITIES = len(cities)
+
 distances = np.linalg.norm(cities[:, None, :] - cities[None, :, :], axis=2)
 pheromones = np.ones((NUM_CITIES, NUM_CITIES))
 heuristic = 1 / (distances + np.diag([np.inf]*NUM_CITIES))
@@ -58,6 +65,6 @@ for iteration in range(NUM_ITERATIONS):
         best_length = min_length
         best_solution = solutions[lengths.index(min_length)]
 
-print("Best route found:")
-print(best_solution)
+print("\nBest route found:")
+print([int(city) for city in best_solution])
 print(f"Total route length: {best_length:.2f}")
