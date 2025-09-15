@@ -1,0 +1,65 @@
+import numpy as np
+import math
+
+def makespan(sequence, processing_times):
+    time = 0
+    for job in sequence:
+        time += processing_times[job]
+    return time
+
+def levy_flight(Lambda):
+    sigma = (math.gamma(1 + Lambda) * math.sin(math.pi * Lambda / 2) / 
+             (math.gamma((1 + Lambda) / 2) * Lambda * 2 ** ((Lambda - 1) / 2))) ** (1 / Lambda)
+    u = np.random.normal(0, sigma)
+    v = np.random.normal(0, 1)
+    step = u / abs(v) ** (1 / Lambda)
+    return step
+
+def get_new_solution(current_solution):
+    n = len(current_solution)
+    step = int(abs(levy_flight(1.5)) * n) % n
+    if step == 0:
+        step = 1
+    new_solution = current_solution.copy()
+    i = np.random.randint(n)
+    j = (i + step) % n
+    new_solution[i], new_solution[j] = new_solution[j], new_solution[i]
+    return new_solution
+
+def cuckoo_search(processing_times, n_nests=15, pa=0.25, n_iter=100, seed=42):
+    np.random.seed(seed)
+    n_jobs = len(processing_times)
+    nests = [np.random.permutation(n_jobs).tolist() for _ in range(n_nests)]
+    fitness = [makespan(nest, processing_times) for nest in nests]
+    best_idx = np.argmin(fitness)
+    best_nest = nests[best_idx]
+    best_fitness = fitness[best_idx]
+
+    for _ in range(n_iter):
+        for i in range(n_nests):
+            new_sol = get_new_solution(nests[i])
+            new_fit = makespan(new_sol, processing_times)
+            j = np.random.randint(n_nests)
+            if new_fit < fitness[j]:
+                nests[j] = new_sol
+                fitness[j] = new_fit
+                if new_fit < best_fitness:
+                    best_nest = new_sol
+                    best_fitness = new_fit
+
+        n_abandon = int(pa * n_nests)
+        if n_abandon > 0:
+            worst_indices = np.argsort(fitness)[-n_abandon:]
+            for idx in worst_indices:
+                nests[idx] = np.random.permutation(n_jobs).tolist()
+                fitness[idx] = makespan(nests[idx], processing_times)
+                if fitness[idx] < best_fitness:
+                    best_nest = nests[idx]
+                    best_fitness = fitness[idx]
+
+    return best_nest, best_fitness
+
+processing_times = [2, 5, 1, 3, 4]
+best_sequence, best_makespan = cuckoo_search(processing_times)
+print("Best sequence:", best_sequence)
+print("Best makespan:", best_makespan)
