@@ -1,0 +1,100 @@
+import numpy as np
+import cv2
+
+image = np.zeros((200, 200), dtype=np.uint8)
+cv2.rectangle(image, (50, 50), (150, 150), 127, -1)
+cv2.circle(image, (100, 100), 40, 200, -1)
+
+cv2.imwrite("test_image.jpg", image)
+print("Synthetic test image created: test_image.jpg")
+
+def otsu_between_class_variance(threshold, histogram, total_pixels):
+    threshold = int(threshold)
+    if threshold == 0 or threshold >= len(histogram):
+        return 0
+
+    weight_bg = np.sum(histogram[:threshold]) / total_pixels
+    weight_fg = np.sum(histogram[threshold:]) / total_pixels
+
+    mean_bg = (np.sum(np.arange(threshold) * histogram[:threshold]) / 
+               np.sum(histogram[:threshold])) if np.sum(histogram[:threshold]) > 0 else 0
+    mean_fg = (np.sum(np.arange(threshold, len(histogram)) * histogram[threshold:]) / 
+               np.sum(histogram[threshold:])) if np.sum(histogram[threshold:]) > 0 else 0
+
+    between_class_var = weight_bg * weight_fg * (mean_bg - mean_fg) ** 2
+    return between_class_var
+
+
+class GreyWolfOptimizer:
+    def __init__(self, obj_func, lb, ub, num_wolves=20, max_iter=50):
+        self.obj_func = obj_func
+        self.lb = lb
+        self.ub = ub
+        self.num_wolves = num_wolves
+        self.max_iter = max_iter
+
+        self.positions = np.random.uniform(self.lb, self.ub, self.num_wolves)
+        self.alpha_pos = 0
+        self.alpha_score = -np.inf
+        self.beta_pos = 0
+        self.beta_score = -np.inf
+        self.delta_pos = 0
+        self.delta_score = -np.inf
+
+    def optimize(self):
+        for iter in range(self.max_iter):
+            for i in range(self.num_wolves):
+                self.positions[i] = np.clip(self.positions[i], self.lb, self.ub)
+                fitness = self.obj_func(self.positions[i])
+
+                if fitness > self.alpha_score:
+                    self.alpha_score = fitness
+                    self.alpha_pos = self.positions[i]
+                elif fitness > self.beta_score:
+                    self.beta_score = fitness
+                    self.beta_pos = self.positions[i]
+                elif fitness > self.delta_score:
+                    self.delta_score = fitness
+                    self.delta_pos = self.positions[i]
+
+            a = 2 - iter * (2 / self.max_iter)
+
+            for i in range(self.num_wolves):
+                r1, r2 = np.random.rand(), np.random.rand()
+                A1 = 2 * a * r1 - a
+                C1 = 2 * r2
+                D_alpha = abs(C1 * self.alpha_pos - self.positions[i])
+                X1 = self.alpha_pos - A1 * D_alpha
+
+                r1, r2 = np.random.rand(), np.random.rand()
+                A2 = 2 * a * r1 - a
+                C2 = 2 * r2
+                D_beta = abs(C2 * self.beta_pos - self.positions[i])
+                X2 = self.beta_pos - A2 * D_beta
+
+                r1, r2 = np.random.rand(), np.random.rand()
+                A3 = 2 * a * r1 - a
+                C3 = 2 * r2
+                D_delta = abs(C3 * self.delta_pos - self.positions[i])
+                X3 = self.delta_pos - A3 * D_delta
+
+                self.positions[i] = (X1 + X2 + X3) / 3
+
+        return self.alpha_pos, self.alpha_score
+
+
+if __name__ == "__main__":
+    image = cv2.imread('test_image.jpg', cv2.IMREAD_GRAYSCALE)
+    if image is None:
+        raise FileNotFoundError("Image file not found. Please check the path.")
+
+    hist = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
+    total_pixels = image.size
+
+    def objective(threshold):
+        return otsu_between_class_variance(threshold, hist, total_pixels)
+
+    gwo = GreyWolfOptimizer(obj_func=objective, lb=0, ub=255, num_wolves=30, max_iter=50)
+    best_threshold, best_fitness = gwo.optimize()
+
+    print(f"\nOptimal Threshold found by GWO: {best_threshold:.2f}")
